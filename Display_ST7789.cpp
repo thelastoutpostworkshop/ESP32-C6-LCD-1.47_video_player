@@ -5,61 +5,61 @@
 #define SPI_WRITE_nByte(_SetData,_ReadData,_Size)     SPI.transferBytes(_SetData,_ReadData,_Size)
 void SPI_Init()
 {
-  SPI.begin(EXAMPLE_PIN_NUM_SCLK,EXAMPLE_PIN_NUM_MISO,EXAMPLE_PIN_NUM_MOSI); 
+  SPI.begin(CLK_PIN,MISO_PIN,MOSI_PIN); 
 }
 
 void LCD_WriteCommand(uint8_t Cmd)  
 { 
   SPI.beginTransaction(SPISettings(SPIFreq, MSBFIRST, SPI_MODE0));
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, LOW);  
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_DC, LOW); 
+  digitalWrite(CS_PIN, LOW);  
+  digitalWrite(DC_PIN, LOW); 
   SPI_WRITE(Cmd);
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, HIGH);  
+  digitalWrite(CS_PIN, HIGH);  
   SPI.endTransaction();
 }
 void LCD_WriteData(uint8_t Data) 
 { 
   SPI.beginTransaction(SPISettings(SPIFreq, MSBFIRST, SPI_MODE0));
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, LOW);  
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_DC, HIGH);  
+  digitalWrite(CS_PIN, LOW);  
+  digitalWrite(DC_PIN, HIGH);  
   SPI_WRITE(Data);  
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, HIGH);  
+  digitalWrite(CS_PIN, HIGH);  
   SPI.endTransaction();
 }    
 
 void LCD_WriteData_Word(uint16_t Data)
 {
   SPI.beginTransaction(SPISettings(SPIFreq, MSBFIRST, SPI_MODE0));
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, LOW);  
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_DC, HIGH); 
+  digitalWrite(CS_PIN, LOW);  
+  digitalWrite(DC_PIN, HIGH); 
   SPI_WRITE_Word(Data);
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, HIGH);  
+  digitalWrite(CS_PIN, HIGH);  
   SPI.endTransaction();
 }  
 void LCD_WriteData_nbyte(uint8_t* SetData,uint8_t* ReadData,uint32_t Size) 
 { 
   SPI.beginTransaction(SPISettings(SPIFreq, MSBFIRST, SPI_MODE0));
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, LOW);  
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_DC, HIGH);  
+  digitalWrite(CS_PIN, LOW);  
+  digitalWrite(DC_PIN, HIGH);  
   SPI_WRITE_nByte(SetData, ReadData, Size);
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, HIGH);  
+  digitalWrite(CS_PIN, HIGH);  
   SPI.endTransaction();
 }    
  
 void LCD_Reset(void)
 {
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_CS, LOW);       
+  digitalWrite(CS_PIN, LOW);       
   delay(50);
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_RST, LOW); 
+  digitalWrite(RESET_PIN, LOW); 
   delay(50);
-  digitalWrite(EXAMPLE_PIN_NUM_LCD_RST, HIGH); 
+  digitalWrite(RESET_PIN, HIGH); 
   delay(50);
 }
 void LCD_Init(void)
 {
-  pinMode(EXAMPLE_PIN_NUM_LCD_CS, OUTPUT);
-  pinMode(EXAMPLE_PIN_NUM_LCD_DC, OUTPUT);
-  pinMode(EXAMPLE_PIN_NUM_LCD_RST, OUTPUT); 
+  pinMode(CS_PIN, OUTPUT);
+  pinMode(DC_PIN, OUTPUT);
+  pinMode(RESET_PIN, OUTPUT); 
   Backlight_Init();
   SPI_Init();
 
@@ -224,8 +224,8 @@ void LCD_addWindow(uint16_t Xstart, uint16_t Ystart, uint16_t Xend, uint16_t Yen
 // backlight
 void Backlight_Init(void)
 {
-  ledcAttach(EXAMPLE_PIN_NUM_BK_LIGHT, Frequency, Resolution);    
-  ledcWrite(EXAMPLE_PIN_NUM_BK_LIGHT, 100);                      
+  ledcAttach(LED_PIN, Frequency, Resolution);    
+  ledcWrite(LED_PIN, 100);                      
 }
 
 void Set_Backlight(uint8_t Light)                        //
@@ -235,7 +235,7 @@ void Set_Backlight(uint8_t Light)                        //
     printf("Set Backlight parameters in the range of 0 to 100 \r\n");
   else{
     uint32_t Backlight = Light*10;
-    ledcWrite(EXAMPLE_PIN_NUM_BK_LIGHT, Backlight);
+    ledcWrite(LED_PIN, Backlight);
   }
 }
 

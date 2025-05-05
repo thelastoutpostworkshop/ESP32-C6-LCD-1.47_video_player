@@ -1,15 +1,7 @@
 #include <AnimatedGIF.h> // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
 #include "SD.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
 #include "FS.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
-
-// Display pins
-#define CS_PIN 14
-#define DC_PIN 15
-#define RESET_PIN 21
-#define LED_PIN 22
-#define MISO_PIN 5
-#define MOSI_PIN 6
-#define CLK_PIN 7
+#include "Display_ST7789.h" // Included in this project
 
 // SD Card pins
 #define SD_CS 4
@@ -20,6 +12,8 @@ void setup()
 {
   delay(2000); // Give time for the board to reconnect to com port
   Serial.begin(115200);
+  flash_size();
+  LCD_Init();    
   SD_Init();
 
   // tft.setTextColor(TFT_GREEN);
@@ -147,4 +141,11 @@ uint16_t Folder_retrieval(const char *directory, const char *fileExtension, char
     Serial.printf("No files with extension '%s' found in directory: %s\r\n", fileExtension, directory);
     return 0;
   }
+}
+void flash_size()
+{
+  // Get Flash size
+  uint32_t flashSize = ESP.getFlashChipSize();
+  Flash_Size = flashSize/1024/1024;
+  Serial.printf("Flash size: %d MB \r\n", flashSize/1024/1024);
 }
