@@ -3,10 +3,21 @@
 #include "FS.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
 #include "Display_ST7789.h" // Included in this project
 
-// SD Card pins
-#define SD_CS 4
+
+#define SD_CS 4 // SD Card CS pin
 uint16_t SDCard_Size;
 uint16_t Flash_Size;
+
+const char *GIF_FOLDER = "/gif";
+AnimatedGIF gif;
+
+// Storage for files to read on the SD card, adjust maximum value as needed
+#define MAX_FILES 20 // Adjust as needed
+String gifFileList[MAX_FILES];
+uint32_t gifFileSizes[MAX_FILES] = {0}; // Store each GIF file's size in bytes
+int fileCount = 0;
+static int currentFile = 0;
+static File FSGifFile; // temp gif file holder
 
 void setup()
 {
@@ -15,6 +26,7 @@ void setup()
   flash_size();
   LCD_Init();    
   SD_Init();
+  loadGifFilesList();
 
   // tft.setTextColor(TFT_GREEN);
   // tft.setFont(FONT_12x16);
@@ -71,77 +83,46 @@ void SD_Init()
     Serial.printf("Free space: %llu\n", totalBytes - usedBytes);
   }
 }
-bool File_Search(const char *directory, const char *fileName)
-{
-  File Path = SD.open(directory);
-  if (!Path)
-  {
-    Serial.printf("Path: <%s> does not exist\r\n", directory);
-    return false;
-  }
-  File file = Path.openNextFile();
-  while (file)
-  {
-    if (strcmp(file.name(), fileName) == 0)
-    {
-      if (strcmp(directory, "/") == 0)
-        Serial.printf("File '%s%s' found in root directory.\r\n", directory, fileName);
-      else
-        Serial.printf("File '%s/%s' found in root directory.\r\n", directory, fileName);
-      Path.close();
-      return true;
-    }
-    file = Path.openNextFile();
-  }
-  if (strcmp(directory, "/") == 0)
-    Serial.printf("File '%s%s' not found in root directory.\r\n", directory, fileName);
-  else
-    Serial.printf("File '%s/%s' not found in root directory.\r\n", directory, fileName);
-  Path.close();
-  return false;
-}
-uint16_t Folder_retrieval(const char *directory, const char *fileExtension, char File_Name[][100], uint16_t maxFiles)
-{
-  File Path = SD.open(directory);
-  if (!Path)
-  {
-    Serial.printf("Path: <%s> does not exist\r\n", directory);
-    return false;
-  }
 
-  uint16_t fileCount = 0;
-  char filePath[100];
-  File file = Path.openNextFile();
-  while (file && fileCount < maxFiles)
+// Read the gif file list in the gif folder
+void loadGifFilesList()
+{
+  File gifDir = SD.open(GIF_FOLDER);
+  if (!gifDir)
   {
-    if (!file.isDirectory() && strstr(file.name(), fileExtension))
+    Serial.println("Failed to open GIF folder");
+    return;
+  }
+  fileCount = 0;
+  while (true)
+  {
+    File file = gifDir.openNextFile();
+    if (!file)
+      break;
+    if (!file.isDirectory())
     {
-      strncpy(File_Name[fileCount], file.name(), sizeof(File_Name[fileCount]));
-      if (strcmp(directory, "/") == 0)
+      String name = file.name();
+      if (name.endsWith(".gif") || name.endsWith(".GIF"))
       {
-        snprintf(filePath, 100, "%s%s", directory, file.name());
+        gifFileList[fileCount] = name;
+        gifFileSizes[fileCount] = file.size(); // Save file size (in bytes)
+        fileCount++;
+        if (fileCount >= MAX_FILES)
+          break;
       }
-      else
-      {
-        snprintf(filePath, 100, "%s/%s", directory, file.name());
-      }
-      Serial.printf("File found: %s\r\n", filePath);
-      fileCount++;
     }
-    file = Path.openNextFile();
+    file.close();
   }
-  Path.close();
-  if (fileCount > 0)
+  gifDir.close();
+  Serial.printf("%d gif files read\n", fileCount);
+  // Optionally, print out each file's size for debugging:
+  for (int i = 0; i < fileCount; i++)
   {
-    Serial.printf(" %d <%s> files were retrieved\r\n", fileCount, fileExtension);
-    return fileCount;
-  }
-  else
-  {
-    Serial.printf("No files with extension '%s' found in directory: %s\r\n", fileExtension, directory);
-    return 0;
+    Serial.printf("File %d: %s, Size: %lu bytes\n", i, gifFileList[i].c_str(), gifFileSizes[i]);
   }
 }
+
+
 void flash_size()
 {
   // Get Flash size
