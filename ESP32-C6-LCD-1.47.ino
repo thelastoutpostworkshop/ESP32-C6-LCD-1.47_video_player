@@ -40,6 +40,10 @@ void setup()
 void loop()
 {
   playSelectedGif(currentGifIndex);
+  currentGifIndex++;
+  if (currentGifIndex >= gifCount) {
+    currentGifIndex = 0;
+  }
 }
 
 // Callback function to open a gif file from the SD card
