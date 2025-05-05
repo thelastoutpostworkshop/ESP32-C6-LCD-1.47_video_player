@@ -1,12 +1,13 @@
-#include <AnimatedGIF.h> // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
-#include "SD.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
-#include "FS.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include <AnimatedGIF.h>    // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
+#include "SD.h"             // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include "FS.h"             // Included with the Espressif Arduino Core (last tested on v3.2.0)
 #include "Display_ST7789.h" // Included in this project
-
 
 #define SD_CS 4 // SD Card CS pin
 uint16_t SDCard_Size;
 uint16_t Flash_Size;
+
+#define BOOT_KEY_PIN 9 // Boot switch used as input
 
 const char *GIF_FOLDER = "/gif";
 AnimatedGIF gif;
@@ -24,9 +25,10 @@ void setup()
   delay(2000); // Give time for the board to reconnect to com port
   Serial.begin(115200);
   flash_size();
-  LCD_Init();    
+  LCD_Init();
   SD_Init();
   loadGifFilesList();
+  pinMode(BOOT_KEY_PIN, INPUT);   
 
   // tft.setTextColor(TFT_GREEN);
   // tft.setFont(FONT_12x16);
@@ -122,11 +124,10 @@ void loadGifFilesList()
   }
 }
 
-
 void flash_size()
 {
   // Get Flash size
   uint32_t flashSize = ESP.getFlashChipSize();
-  Flash_Size = flashSize/1024/1024;
-  Serial.printf("Flash size: %d MB \r\n", flashSize/1024/1024);
+  Flash_Size = flashSize / 1024 / 1024;
+  Serial.printf("Flash size: %d MB \r\n", flashSize / 1024 / 1024);
 }
