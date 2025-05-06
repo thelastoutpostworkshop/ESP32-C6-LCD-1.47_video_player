@@ -24,12 +24,12 @@ void setup()
 {
   delay(2000); // Give time for the board to reconnect to com port
   Serial.begin(115200);
-  flash_size();
   LCD_Init();
   SD_Init();
   loadGifFilesList();
   pinMode(BOOT_KEY_PIN, INPUT);
   gif.begin(BIG_ENDIAN_PIXELS);
+  memoryInfo();
 
   // tft.setTextColor(TFT_GREEN);
   // tft.setFont(FONT_12x16);
@@ -303,10 +303,34 @@ void loadGifFilesList()
   }
 }
 
-void flash_size()
+void memoryInfo()
 {
-  // Get Flash size
-  uint32_t flashSize = ESP.getFlashChipSize();
-  Flash_Size = flashSize / 1024 / 1024;
-  Serial.printf("Flash size: %d MB \r\n", flashSize / 1024 / 1024);
+    /* ---------- FLASH / SKETCH ---------- */
+    const uint32_t flashSize     = ESP.getFlashChipSize();   // bytes
+    const uint32_t sketchSize    = ESP.getSketchSize();      // bytes currently used by the application
+    const uint32_t freeSketch    = ESP.getFreeSketchSpace(); // bytes still available for future OTA updates or larger binaries
+
+    Flash_Size = flashSize / 1024 / 1024; // preserve the old global
+
+    Serial.println(F("=== Flash / Sketch ==="));
+    Serial.printf("Flash chip size   : %u MB\r\n", flashSize  / 1024 / 1024);
+    Serial.printf("Sketch size       : %u KB\r\n", sketchSize / 1024);
+    Serial.printf("Free sketch space : %u KB\r\n", freeSketch / 1024);
+
+    /* ---------- HEAP (internal RAM) ---------- */
+    const uint32_t freeHeap = ESP.getFreeHeap(); // bytes of allocatable DRAM at this moment
+
+    Serial.println(F("\n=== RAM ==="));
+    Serial.printf("Free heap         : %u KB\r\n", freeHeap / 1024);
+
+#if CONFIG_SPIRAM_SUPPORT     // True when PSRAM is compiled‑in
+    /* ---------- PSRAM (external RAM) ---------- */
+    const uint32_t psramSize  = ESP.getPsramSize();  // total bytes of PSRAM
+    const uint32_t freePsram  = ESP.getFreePsram();  // bytes currently free in PSRAM
+
+    Serial.printf("PSRAM size        : %u MB\r\n", psramSize / 1024 / 1024);
+    Serial.printf("Free PSRAM        : %u KB\r\n", freePsram / 1024);
+#endif
+
+    Serial.println(); // blank line for readability
 }
