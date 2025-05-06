@@ -192,22 +192,43 @@ void GIFDraw(GIFDRAW *pDraw)
 // Play a gif directly from the SD card
 void gifPlayFromSDCard(char *gifPath)
 {
+    if (!gif.open(gifPath,
+                  GIFOpenFile, GIFCloseFile,
+                  GIFReadFile, GIFSeekFile, GIFDraw))
+    {
+        Serial.printf("Could not open gif %s\n", gifPath);
+        return;
+    }
 
-  if (!gif.open(gifPath, GIFOpenFile, GIFCloseFile, GIFReadFile, GIFSeekFile, GIFDraw))
-  {
-    Serial.printf("Could not open gif %s", gifPath);
-  }
-  else
-  {
     Serial.printf("Starting playing gif %s\n", gifPath);
 
-    while (gif.playFrame(false /*change to true to use the internal gif frame duration*/, NULL))
+    /* ----------  timing variables  ---------- */
+    uint32_t tGifStart   = millis();    // whole‑GIF timer
+    uint32_t frameIndex  = 0;
+
+    /* ----------  play loop  ---------- */
+    while (true)
     {
+        uint32_t tFrameStart = micros();              // per‑frame timer
+
+        bool more = gif.playFrame(false /*use internal delay?*/, nullptr);
+
+        uint32_t frameTime = micros() - tFrameStart;  // µs for this frame
+        Serial.printf("Frame %u rendered in %u µs (%.2f ms)\n",
+                      frameIndex++, frameTime, frameTime / 1000.0f);
+
+        if (!more)                                   // last frame done?
+            break;
     }
 
     gif.close();
-  }
+
+    /* ----------  final stats  ---------- */
+    uint32_t gifElapsed = millis() - tGifStart;      // ms
+    Serial.printf("Finished %s: %u frames in %u ms (%.2f s)\n\n",
+                  gifPath, frameIndex, gifElapsed, gifElapsed / 1000.0f);
 }
+
 
 void playSelectedGif(int gifIndex)
 {
