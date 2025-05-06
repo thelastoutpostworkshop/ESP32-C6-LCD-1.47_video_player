@@ -244,7 +244,7 @@ void playSelectedGif(int gifIndex)
 void SD_Init()
 {
   // SD
-  if (SD.begin(SD_CS, SPI, 80000000, "/sd", 5, true))
+  if (SD.begin(SD_CS, SPI, 80000000, "/sd"))
   {
     Serial.printf("SD card initialization successful!\r\n");
   }
