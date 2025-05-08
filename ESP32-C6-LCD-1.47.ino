@@ -1,7 +1,25 @@
-#include <AnimatedGIF.h>    // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
-#include "SD.h"             // Included with the Espressif Arduino Core (last tested on v3.2.0)
-#include "FS.h"             // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include <AnimatedGIF.h> // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
+#include "SD.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include "FS.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
+
+#define USE_BB_LCD_SPI
+
+#ifdef USE_BB_LCD_SPI
+#include <bb_spi_lcd.h>
+#include <SPI.h>
+#define LCD_WIDTH 172  // LCD width
+#define LCD_HEIGHT 320 // LCD height
+#define MISO_PIN 5
+#define MOSI_PIN 6
+#define CLK_PIN 7
+#define CS_PIN 14
+#define DC_PIN 15
+#define RESET_PIN 21
+#define LED_PIN 22
+BB_SPI_LCD tft; // Main object for the display driver
+#else
 #include "Display_ST7789.h" // Included in this project
+#endif
 
 #define SD_CS 4 // SD Card CS pin
 uint16_t SDCard_Size;
@@ -24,8 +42,28 @@ void setup()
 {
   delay(2000); // Give time for the board to reconnect to com port
   Serial.begin(115200);
-  LCD_Init();
+#ifdef USE_BB_LCD_SPI
+  // SPI.begin(CLK_PIN, MISO_PIN, MOSI_PIN);
+  // if (SD.begin(SD_CS))
+  pinMode(CS_PIN, OUTPUT);
+  pinMode(DC_PIN, OUTPUT);
+  pinMode(RESET_PIN, OUTPUT); 
+  SPI.begin(CLK_PIN,MISO_PIN,MOSI_PIN,SD_CS); 
   SD_Init();
+  loadGifFilesList();
+  
+  tft.begin(LCD_ST7789_172, FLAGS_NONE, 80000000, CS_PIN, DC_PIN, RESET_PIN, LED_PIN, MISO_PIN, MOSI_PIN, CLK_PIN);
+  tft.fillScreen(TFT_GREEN);
+
+#else
+  LCD_Init();
+  // pinMode(CS_PIN, OUTPUT);
+  // pinMode(DC_PIN, OUTPUT);
+  // pinMode(RESET_PIN, OUTPUT); 
+  // // Backlight_Init();
+  // SPI_Init();
+  SD_Init();
+#endif
   loadGifFilesList();
   pinMode(BOOT_KEY_PIN, INPUT);
   gif.begin(BIG_ENDIAN_PIXELS);
@@ -146,6 +184,9 @@ void GIFDraw(GIFDRAW *pDraw)
       } // while looking for opaque pixels
       if (iCount)
       { // any opaque pixels?
+#ifdef USE_BB_LCD_SPI
+        tft.pushPixels(usTemp, iCount, DRAW_TO_LCD);
+#else
         LCD_addWindow(
             pDraw->iX + x,              // Xstart
             y,                          // Ystart
@@ -153,6 +194,7 @@ void GIFDraw(GIFDRAW *pDraw)
             y,                          // Yend   (only one scan‑line tall)
             usTemp                      // pixel buffer (RGB565, big‑endian)
         );
+#endif
         x += iCount;
         iCount = 0;
       }
@@ -179,6 +221,9 @@ void GIFDraw(GIFDRAW *pDraw)
     // Translate the 8-bit pixels through the RGB565 palette (already byte reversed)
     for (x = 0; x < iWidth; x++)
       usTemp[x] = usPalette[*s++];
+#ifdef USE_BB_LCD_SPI
+    tft.pushPixels(usTemp, iWidth, DRAW_TO_LCD);
+#else
     LCD_addWindow(
         pDraw->iX,              // Xstart
         y,                      // Ystart
@@ -186,49 +231,49 @@ void GIFDraw(GIFDRAW *pDraw)
         y,                      // Yend
         usTemp                  // pixel buffer
     );
+#endif
   }
-} 
+}
 
 // Play a gif directly from the SD card
 void gifPlayFromSDCard(char *gifPath)
 {
-    if (!gif.open(gifPath,
-                  GIFOpenFile, GIFCloseFile,
-                  GIFReadFile, GIFSeekFile, GIFDraw))
-    {
-        Serial.printf("Could not open gif %s\n", gifPath);
-        return;
-    }
+  if (!gif.open(gifPath,
+                GIFOpenFile, GIFCloseFile,
+                GIFReadFile, GIFSeekFile, GIFDraw))
+  {
+    Serial.printf("Could not open gif %s\n", gifPath);
+    return;
+  }
 
-    Serial.printf("Starting playing gif %s\n", gifPath);
+  Serial.printf("Starting playing gif %s\n", gifPath);
 
-    /* ----------  timing variables  ---------- */
-    uint32_t tGifStart   = millis();    // whole‑GIF timer
-    uint32_t frameIndex  = 0;
+  /* ----------  timing variables  ---------- */
+  uint32_t tGifStart = millis(); // whole‑GIF timer
+  uint32_t frameIndex = 0;
 
-    /* ----------  play loop  ---------- */
-    while (true)
-    {
-        uint32_t tFrameStart = micros();              // per‑frame timer
+  /* ----------  play loop  ---------- */
+  while (true)
+  {
+    uint32_t tFrameStart = micros(); // per‑frame timer
 
-        bool more = gif.playFrame(false /*use internal delay?*/, nullptr);
+    bool more = gif.playFrame(false /*use internal delay?*/, nullptr);
 
-        uint32_t frameTime = micros() - tFrameStart;  // µs for this frame
-        Serial.printf("Frame %u rendered in %u µs (%.2f ms)\n",
-                      frameIndex++, frameTime, frameTime / 1000.0f);
+    uint32_t frameTime = micros() - tFrameStart; // µs for this frame
+    Serial.printf("Frame %u rendered in %u µs (%.2f ms)\n",
+                  frameIndex++, frameTime, frameTime / 1000.0f);
 
-        if (!more)                                   // last frame done?
-            break;
-    }
+    if (!more) // last frame done?
+      break;
+  }
 
-    gif.close();
+  gif.close();
 
-    /* ----------  final stats  ---------- */
-    uint32_t gifElapsed = millis() - tGifStart;      // ms
-    Serial.printf("Finished %s: %u frames in %u ms (%.2f s)\n\n",
-                  gifPath, frameIndex, gifElapsed, gifElapsed / 1000.0f);
+  /* ----------  final stats  ---------- */
+  uint32_t gifElapsed = millis() - tGifStart; // ms
+  Serial.printf("Finished %s: %u frames in %u ms (%.2f s)\n\n",
+                gifPath, frameIndex, gifElapsed, gifElapsed / 1000.0f);
 }
-
 
 void playSelectedGif(int gifIndex)
 {
@@ -292,8 +337,11 @@ void loadGifFilesList()
   File gifDir = SD.open(GIF_FOLDER);
   if (!gifDir)
   {
-    Serial.println("Failed to open GIF folder");
-    return;
+    Serial.printf("Failed to open %s folder\n",GIF_FOLDER);
+    while (true)
+    {
+      /* code */
+    }
   }
   gifCount = 0;
   while (true)
@@ -326,32 +374,32 @@ void loadGifFilesList()
 
 void memoryInfo()
 {
-    /* ---------- FLASH / SKETCH ---------- */
-    const uint32_t flashSize     = ESP.getFlashChipSize();   // bytes
-    const uint32_t sketchSize    = ESP.getSketchSize();      // bytes currently used by the application
-    const uint32_t freeSketch    = ESP.getFreeSketchSpace(); // bytes still available for future OTA updates or larger binaries
+  /* ---------- FLASH / SKETCH ---------- */
+  const uint32_t flashSize = ESP.getFlashChipSize();    // bytes
+  const uint32_t sketchSize = ESP.getSketchSize();      // bytes currently used by the application
+  const uint32_t freeSketch = ESP.getFreeSketchSpace(); // bytes still available for future OTA updates or larger binaries
 
-    Flash_Size = flashSize / 1024 / 1024; // preserve the old global
+  Flash_Size = flashSize / 1024 / 1024; // preserve the old global
 
-    Serial.println(F("=== Flash / Sketch ==="));
-    Serial.printf("Flash chip size   : %u MB\r\n", flashSize  / 1024 / 1024);
-    Serial.printf("Sketch size       : %u KB\r\n", sketchSize / 1024);
-    Serial.printf("Free sketch space : %u KB\r\n", freeSketch / 1024);
+  Serial.println(F("=== Flash / Sketch ==="));
+  Serial.printf("Flash chip size   : %u MB\r\n", flashSize / 1024 / 1024);
+  Serial.printf("Sketch size       : %u KB\r\n", sketchSize / 1024);
+  Serial.printf("Free sketch space : %u KB\r\n", freeSketch / 1024);
 
-    /* ---------- HEAP (internal RAM) ---------- */
-    const uint32_t freeHeap = ESP.getFreeHeap(); // bytes of allocatable DRAM at this moment
+  /* ---------- HEAP (internal RAM) ---------- */
+  const uint32_t freeHeap = ESP.getFreeHeap(); // bytes of allocatable DRAM at this moment
 
-    Serial.println(F("\n=== RAM ==="));
-    Serial.printf("Free heap         : %u KB\r\n", freeHeap / 1024);
+  Serial.println(F("\n=== RAM ==="));
+  Serial.printf("Free heap         : %u KB\r\n", freeHeap / 1024);
 
-#if CONFIG_SPIRAM_SUPPORT     // True when PSRAM is compiled‑in
-    /* ---------- PSRAM (external RAM) ---------- */
-    const uint32_t psramSize  = ESP.getPsramSize();  // total bytes of PSRAM
-    const uint32_t freePsram  = ESP.getFreePsram();  // bytes currently free in PSRAM
+#if CONFIG_SPIRAM_SUPPORT // True when PSRAM is compiled‑in
+  /* ---------- PSRAM (external RAM) ---------- */
+  const uint32_t psramSize = ESP.getPsramSize(); // total bytes of PSRAM
+  const uint32_t freePsram = ESP.getFreePsram(); // bytes currently free in PSRAM
 
-    Serial.printf("PSRAM size        : %u MB\r\n", psramSize / 1024 / 1024);
-    Serial.printf("Free PSRAM        : %u KB\r\n", freePsram / 1024);
+  Serial.printf("PSRAM size        : %u MB\r\n", psramSize / 1024 / 1024);
+  Serial.printf("Free PSRAM        : %u KB\r\n", freePsram / 1024);
 #endif
 
-    Serial.println(); // blank line for readability
+  Serial.println(); // blank line for readability
 }
