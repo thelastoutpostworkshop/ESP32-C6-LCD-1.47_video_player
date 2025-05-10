@@ -286,13 +286,3 @@ void loadGifFilesList()
         Serial.printf("File %d: %s, Size: %lu bytes\n", i, gifFileList[i].c_str(), gifFileSizes[i]);
     }
 }
-
-void *GIFAlloc(uint32_t u32Size)
-{
-    return malloc(u32Size);
-} /* GIFAlloc() */
-// memory free callback function
-void GIFFree(void *p)
-{
-    free(p);
-}
