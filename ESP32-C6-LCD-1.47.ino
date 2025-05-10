@@ -1,31 +1,17 @@
+// Tutorial : 
+// Use board "ESP32C6 Dev Module" (last tested on v3.2.0)
+//
+
+// Install "GFX Library for Arduino" with the Library Manager (last tested on v1.5.9)
+
 #include <AnimatedGIF.h> // Install this library with the Arduino IDE Library Manager (last tested on v2.2.0)
 #include "SD.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
 #include "FS.h"          // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include "PINS_ESP32-C6-LCD-1_47.h"
 
-#define USE_BB_LCD_SPI
-
-#ifdef USE_BB_LCD_SPI
-#include <bb_spi_lcd.h>
-#include <SPI.h>
+#define GFX_BRIGHTNESS 255
 #define LCD_WIDTH 172  // LCD width
 #define LCD_HEIGHT 320 // LCD height
-#define MISO_PIN 5
-#define MOSI_PIN 6
-#define CLK_PIN 7
-#define CS_PIN 14
-#define DC_PIN 15
-#define RESET_PIN 21
-#define LED_PIN 22
-BB_SPI_LCD tft; // Main object for the display driver
-#else
-#include "Display_ST7789.h" // Included in this project
-#endif
-
-#define SD_CS 4 // SD Card CS pin
-uint16_t SDCard_Size;
-uint16_t Flash_Size;
-
-#define BOOT_KEY_PIN 9 // Boot switch used as input
 
 const char *GIF_FOLDER = "/gif";
 AnimatedGIF gif;
@@ -40,366 +26,273 @@ static File FSGifFile; // temp gif file holder
 
 void setup()
 {
-  delay(2000); // Give time for the board to reconnect to com port
-  Serial.begin(115200);
-#ifdef USE_BB_LCD_SPI
-  // SPI.begin(CLK_PIN, MISO_PIN, MOSI_PIN);
-  // if (SD.begin(SD_CS))
-  pinMode(CS_PIN, OUTPUT);
-  pinMode(DC_PIN, OUTPUT);
-  pinMode(RESET_PIN, OUTPUT); 
-  SPI.begin(CLK_PIN,MISO_PIN,MOSI_PIN,SD_CS); 
-  SD_Init();
-  loadGifFilesList();
-  
-  tft.begin(LCD_ST7789_172, FLAGS_NONE, 80000000, CS_PIN, DC_PIN, RESET_PIN, LED_PIN, MISO_PIN, MOSI_PIN, CLK_PIN);
-  tft.fillScreen(TFT_GREEN);
-
-#else
-  LCD_Init();
-  // pinMode(CS_PIN, OUTPUT);
-  // pinMode(DC_PIN, OUTPUT);
-  // pinMode(RESET_PIN, OUTPUT); 
-  // // Backlight_Init();
-  // SPI_Init();
-  SD_Init();
-#endif
-  loadGifFilesList();
-  pinMode(BOOT_KEY_PIN, INPUT);
-  gif.begin(BIG_ENDIAN_PIXELS);
-  memoryInfo();
-
-  // tft.setTextColor(TFT_GREEN);
-  // tft.setFont(FONT_12x16);
-  // tft.println("Generic SPI display");
-  // tft.println("Using bb_spi_lcd");
+    DEV_DEVICE_INIT();
+    delay(2000); // Give time for the board to reconnect to com port
+    Serial.begin(115200);
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+    // Init Display
+    if (!gfx->begin(GFX_SPEED))
+    {
+        Serial.println("gfx->begin() failed!");
+        while (true)
+        {
+            /* code */
+        }
+    }
+    gfx->fillScreen(RGB565_BLACK);
+    gfx->setRotation(0);
+    ledcAttachChannel(GFX_BL, 1000, 8, 1);
+    ledcWrite(GFX_BL, GFX_BRIGHTNESS);
+    if (!SD.begin(SD_CS, SPI, 80000000, "/sd"))
+    {
+        Serial.println("ERROR: File system mount failed!");
+        while (true)
+        {
+            /* code */
+        }
+    }
+    gif.begin(BIG_ENDIAN_PIXELS);
+    loadGifFilesList();
 }
 
 void loop()
 {
-  playSelectedGif(currentGifIndex);
-  currentGifIndex++;
-  if (currentGifIndex >= gifCount)
-  {
-    currentGifIndex = 0;
-  }
+    playSelectedGif(currentGifIndex);
+    currentGifIndex++;
+    if (currentGifIndex >= gifCount)
+    {
+        currentGifIndex = 0;
+    }
 }
 
 // Callback function to open a gif file from the SD card
 static void *GIFOpenFile(const char *fname, int32_t *pSize)
 {
-  Serial.printf("Opening %s from SD\n", fname);
-  FSGifFile = SD.open(fname);
-  if (FSGifFile)
-  {
-    *pSize = FSGifFile.size();
-    return (void *)&FSGifFile;
-  }
-  return NULL;
+    Serial.printf("Opening %s from SD\n", fname);
+    FSGifFile = SD.open(fname);
+    if (FSGifFile)
+    {
+        *pSize = FSGifFile.size();
+        return (void *)&FSGifFile;
+    }
+    return NULL;
 }
 
 // Callback function to close a gif file from the SD card
 static void GIFCloseFile(void *pHandle)
 {
-  File *f = static_cast<File *>(pHandle);
-  if (f != NULL)
-    f->close();
+    File *f = static_cast<File *>(pHandle);
+    if (f != NULL)
+        f->close();
 }
 
 // Callback function to read a gif file from the SD card
 static int32_t GIFReadFile(GIFFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
-  int32_t iBytesRead;
-  iBytesRead = iLen;
-  File *f = static_cast<File *>(pFile->fHandle);
-  // Note: If you read a file all the way to the last byte, seek() stops working
-  if ((pFile->iSize - pFile->iPos) < iLen)
-    iBytesRead = pFile->iSize - pFile->iPos - 1; // <-- ugly work-around
-  if (iBytesRead <= 0)
-    return 0;
-  iBytesRead = (int32_t)f->read(pBuf, iBytesRead);
-  pFile->iPos = f->position();
-  return iBytesRead;
+    int32_t iBytesRead;
+    iBytesRead = iLen;
+    File *f = static_cast<File *>(pFile->fHandle);
+    // Note: If you read a file all the way to the last byte, seek() stops working
+    if ((pFile->iSize - pFile->iPos) < iLen)
+        iBytesRead = pFile->iSize - pFile->iPos - 1; // <-- ugly work-around
+    if (iBytesRead <= 0)
+        return 0;
+    iBytesRead = (int32_t)f->read(pBuf, iBytesRead);
+    pFile->iPos = f->position();
+    return iBytesRead;
 }
 
 // Callback function to seek a gif file from the SD card
 static int32_t GIFSeekFile(GIFFILE *pFile, int32_t iPosition)
 {
-  int i = micros();
-  File *f = static_cast<File *>(pFile->fHandle);
-  f->seek(iPosition);
-  pFile->iPos = (int32_t)f->position();
-  i = micros() - i;
-  // log_d("Seek time = %d us\n", i);
-  return pFile->iPos;
+    int i = micros();
+    File *f = static_cast<File *>(pFile->fHandle);
+    f->seek(iPosition);
+    pFile->iPos = (int32_t)f->position();
+    i = micros() - i;
+    // log_d("Seek time = %d us\n", i);
+    return pFile->iPos;
 }
 
 // Callback function to Draw a line of image directly on the screen
 void GIFDraw(GIFDRAW *pDraw)
 {
-  uint8_t *s;
-  uint16_t *d, *usPalette, usTemp[320];
-  int x, y, iWidth;
+    uint8_t *s;
+    uint16_t *d, *usPalette, usTemp[320];
+    int x, y, iWidth;
 
-  iWidth = pDraw->iWidth;
-  if (iWidth > LCD_WIDTH)
-    iWidth = LCD_WIDTH;
-  usPalette = pDraw->pPalette;
-  y = pDraw->iY + pDraw->y; // current line
+    iWidth = pDraw->iWidth;
+    if (iWidth > LCD_WIDTH)
+        iWidth = LCD_WIDTH;
+    usPalette = pDraw->pPalette;
+    y = pDraw->iY + pDraw->y; // current line
 
-  s = pDraw->pPixels;
-  if (pDraw->ucDisposalMethod == 2)
-  { // restore to background color
-    for (x = 0; x < iWidth; x++)
-    {
-      if (s[x] == pDraw->ucTransparent)
-        s[x] = pDraw->ucBackground;
-    }
-    pDraw->ucHasTransparency = 0;
-  }
-  // Apply the new pixels to the main image
-  if (pDraw->ucHasTransparency)
-  { // if transparency used
-    uint8_t *pEnd, c, ucTransparent = pDraw->ucTransparent;
-    int x, iCount;
-    pEnd = s + iWidth;
-    x = 0;
-    iCount = 0; // count non-transparent pixels
-    while (x < iWidth)
-    {
-      c = ucTransparent - 1;
-      d = usTemp;
-      while (c != ucTransparent && s < pEnd)
-      {
-        c = *s++;
-        if (c == ucTransparent)
-        {      // done, stop
-          s--; // back up to treat it like transparent
-        }
-        else
-        { // opaque
-          *d++ = usPalette[c];
-          iCount++;
-        }
-      } // while looking for opaque pixels
-      if (iCount)
-      { // any opaque pixels?
-#ifdef USE_BB_LCD_SPI
-        tft.pushPixels(usTemp, iCount, DRAW_TO_LCD);
-#else
-        LCD_addWindow(
-            pDraw->iX + x,              // Xstart
-            y,                          // Ystart
-            pDraw->iX + x + iCount - 1, // Xend  (inclusive)
-            y,                          // Yend   (only one scan‑line tall)
-            usTemp                      // pixel buffer (RGB565, big‑endian)
-        );
-#endif
-        x += iCount;
-        iCount = 0;
-      }
-      // no, look for a run of transparent pixels
-      c = ucTransparent;
-      while (c == ucTransparent && s < pEnd)
-      {
-        c = *s++;
-        if (c == ucTransparent)
-          iCount++;
-        else
-          s--;
-      }
-      if (iCount)
-      {
-        x += iCount; // skip these
-        iCount = 0;
-      }
-    }
-  }
-  else
-  {
     s = pDraw->pPixels;
-    // Translate the 8-bit pixels through the RGB565 palette (already byte reversed)
-    for (x = 0; x < iWidth; x++)
-      usTemp[x] = usPalette[*s++];
-#ifdef USE_BB_LCD_SPI
-    tft.pushPixels(usTemp, iWidth, DRAW_TO_LCD);
-#else
-    LCD_addWindow(
-        pDraw->iX,              // Xstart
-        y,                      // Ystart
-        pDraw->iX + iWidth - 1, // Xend
-        y,                      // Yend
-        usTemp                  // pixel buffer
-    );
-#endif
-  }
+    if (pDraw->ucDisposalMethod == 2)
+    { // restore to background color
+        for (x = 0; x < iWidth; x++)
+        {
+            if (s[x] == pDraw->ucTransparent)
+                s[x] = pDraw->ucBackground;
+        }
+        pDraw->ucHasTransparency = 0;
+    }
+    // Apply the new pixels to the main image
+    if (pDraw->ucHasTransparency)
+    { // if transparency used
+        uint8_t *pEnd, c, ucTransparent = pDraw->ucTransparent;
+        int x, iCount;
+        pEnd = s + iWidth;
+        x = 0;
+        iCount = 0; // count non-transparent pixels
+        while (x < iWidth)
+        {
+            c = ucTransparent - 1;
+            d = usTemp;
+            while (c != ucTransparent && s < pEnd)
+            {
+                c = *s++;
+                if (c == ucTransparent)
+                {        // done, stop
+                    s--; // back up to treat it like transparent
+                }
+                else
+                { // opaque
+                    *d++ = usPalette[c];
+                    iCount++;
+                }
+            } // while looking for opaque pixels
+            if (iCount)
+            { // any opaque pixels?
+                gfx->draw16bitBeRGBBitmap(pDraw->iX + x, y, usTemp, iCount, 1);
+                x += iCount;
+                iCount = 0;
+            }
+            // no, look for a run of transparent pixels
+            c = ucTransparent;
+            while (c == ucTransparent && s < pEnd)
+            {
+                c = *s++;
+                if (c == ucTransparent)
+                    iCount++;
+                else
+                    s--;
+            }
+            if (iCount)
+            {
+                x += iCount; // skip these
+                iCount = 0;
+            }
+        }
+    }
+    else
+    {
+        s = pDraw->pPixels;
+        // Translate the 8-bit pixels through the RGB565 palette (already byte reversed)
+        for (x = 0; x < iWidth; x++)
+            usTemp[x] = usPalette[*s++];
+        gfx->draw16bitBeRGBBitmap(pDraw->iX, y, usTemp, iWidth, 1);
+    }
 }
 
 // Play a gif directly from the SD card
 void gifPlayFromSDCard(char *gifPath)
 {
-  if (!gif.open(gifPath,
-                GIFOpenFile, GIFCloseFile,
-                GIFReadFile, GIFSeekFile, GIFDraw))
-  {
-    Serial.printf("Could not open gif %s\n", gifPath);
-    return;
-  }
+    if (!gif.open(gifPath,
+                  GIFOpenFile, GIFCloseFile,
+                  GIFReadFile, GIFSeekFile, GIFDraw))
+    {
+        Serial.printf("Could not open gif %s\n", gifPath);
+        return;
+    }
 
-  Serial.printf("Starting playing gif %s\n", gifPath);
+    Serial.printf("Starting playing gif %s\n", gifPath);
 
-  /* ----------  timing variables  ---------- */
-  uint32_t tGifStart = millis(); // whole‑GIF timer
-  uint32_t frameIndex = 0;
+    /* ----------  timing variables  ---------- */
+    uint32_t tGifStart = millis(); // whole‑GIF timer
+    uint32_t frameIndex = 0;
 
-  /* ----------  play loop  ---------- */
-  while (true)
-  {
-    uint32_t tFrameStart = micros(); // per‑frame timer
+    /* ----------  play loop  ---------- */
+    while (true)
+    {
+        uint32_t tFrameStart = micros(); // per‑frame timer
 
-    bool more = gif.playFrame(false /*use internal delay?*/, nullptr);
+        bool more = gif.playFrame(false /*use internal delay?*/, nullptr);
 
-    uint32_t frameTime = micros() - tFrameStart; // µs for this frame
-    Serial.printf("Frame %u rendered in %u µs (%.2f ms)\n",
-                  frameIndex++, frameTime, frameTime / 1000.0f);
+        uint32_t frameTime = micros() - tFrameStart; // µs for this frame
+        Serial.printf("Frame %u rendered in %u µs (%.2f ms)\n",
+                      frameIndex++, frameTime, frameTime / 1000.0f);
 
-    if (!more) // last frame done?
-      break;
-  }
+        if (!more) // last frame done?
+            break;
+    }
 
-  gif.close();
+    gif.close();
 
-  /* ----------  final stats  ---------- */
-  uint32_t gifElapsed = millis() - tGifStart; // ms
-  Serial.printf("Finished %s: %u frames in %u ms (%.2f s)\n\n",
-                gifPath, frameIndex, gifElapsed, gifElapsed / 1000.0f);
+    /* ----------  final stats  ---------- */
+    uint32_t gifElapsed = millis() - tGifStart; // ms
+    Serial.printf("Finished %s: %u frames in %u ms (%.2f s)\n\n",
+                  gifPath, frameIndex, gifElapsed, gifElapsed / 1000.0f);
 }
 
 void playSelectedGif(int gifIndex)
 {
-  // Build the full path for the selected GIF.
-  String fullPath = String(GIF_FOLDER) + "/" + gifFileList[gifIndex];
-  char gifFilename[128];
-  fullPath.toCharArray(gifFilename, sizeof(gifFilename));
+    // Build the full path for the selected GIF.
+    String fullPath = String(GIF_FOLDER) + "/" + gifFileList[gifIndex];
+    char gifFilename[128];
+    fullPath.toCharArray(gifFilename, sizeof(gifFilename));
 
-  Serial.printf("Playing %s\n", gifFilename);
-  gifPlayFromSDCard(gifFilename);
-}
-
-void SD_Init()
-{
-  // SD
-  if (SD.begin(SD_CS, SPI, 80000000, "/sd"))
-  {
-    Serial.printf("SD card initialization successful!\r\n");
-  }
-  else
-  {
-    Serial.printf("SD card initialization failed!\r\n");
-  }
-  uint8_t cardType = SD.cardType();
-  if (cardType == CARD_NONE)
-  {
-    Serial.printf("No SD card attached\r\n");
-    return;
-  }
-  else
-  {
-    Serial.printf("SD Card Type: ");
-    if (cardType == CARD_MMC)
-    {
-      Serial.printf("MMC\r\n");
-    }
-    else if (cardType == CARD_SD)
-    {
-      Serial.printf("SDSC\r\n");
-    }
-    else if (cardType == CARD_SDHC)
-    {
-      Serial.printf("SDHC\r\n");
-    }
-    else
-    {
-      Serial.printf("UNKNOWN\r\n");
-    }
-    uint64_t totalBytes = SD.totalBytes();
-    uint64_t usedBytes = SD.usedBytes();
-    SDCard_Size = totalBytes / (1024 * 1024);
-    Serial.printf("Total space: %llu\n", totalBytes);
-    Serial.printf("Used space: %llu\n", usedBytes);
-    Serial.printf("Free space: %llu\n", totalBytes - usedBytes);
-  }
+    Serial.printf("Playing %s\n", gifFilename);
+    gifPlayFromSDCard(gifFilename);
 }
 
 // Read the gif file list in the gif folder
 void loadGifFilesList()
 {
-  File gifDir = SD.open(GIF_FOLDER);
-  if (!gifDir)
-  {
-    Serial.printf("Failed to open %s folder\n",GIF_FOLDER);
+    File gifDir = SD.open(GIF_FOLDER);
+    if (!gifDir)
+    {
+        Serial.printf("Failed to open %s folder\n", GIF_FOLDER);
+        while (true)
+        {
+            /* code */
+        }
+    }
+    gifCount = 0;
     while (true)
     {
-      /* code */
+        File file = gifDir.openNextFile();
+        if (!file)
+            break;
+        if (!file.isDirectory())
+        {
+            String name = file.name();
+            if (name.endsWith(".gif") || name.endsWith(".GIF"))
+            {
+                gifFileList[gifCount] = name;
+                gifFileSizes[gifCount] = file.size(); // Save file size (in bytes)
+                gifCount++;
+                if (gifCount >= MAX_FILES)
+                    break;
+            }
+        }
+        file.close();
     }
-  }
-  gifCount = 0;
-  while (true)
-  {
-    File file = gifDir.openNextFile();
-    if (!file)
-      break;
-    if (!file.isDirectory())
+    gifDir.close();
+    Serial.printf("%d gif files read\n", gifCount);
+    // Optionally, print out each file's size for debugging:
+    for (int i = 0; i < gifCount; i++)
     {
-      String name = file.name();
-      if (name.endsWith(".gif") || name.endsWith(".GIF"))
-      {
-        gifFileList[gifCount] = name;
-        gifFileSizes[gifCount] = file.size(); // Save file size (in bytes)
-        gifCount++;
-        if (gifCount >= MAX_FILES)
-          break;
-      }
+        Serial.printf("File %d: %s, Size: %lu bytes\n", i, gifFileList[i].c_str(), gifFileSizes[i]);
     }
-    file.close();
-  }
-  gifDir.close();
-  Serial.printf("%d gif files read\n", gifCount);
-  // Optionally, print out each file's size for debugging:
-  for (int i = 0; i < gifCount; i++)
-  {
-    Serial.printf("File %d: %s, Size: %lu bytes\n", i, gifFileList[i].c_str(), gifFileSizes[i]);
-  }
 }
 
-void memoryInfo()
+void *GIFAlloc(uint32_t u32Size)
 {
-  /* ---------- FLASH / SKETCH ---------- */
-  const uint32_t flashSize = ESP.getFlashChipSize();    // bytes
-  const uint32_t sketchSize = ESP.getSketchSize();      // bytes currently used by the application
-  const uint32_t freeSketch = ESP.getFreeSketchSpace(); // bytes still available for future OTA updates or larger binaries
-
-  Flash_Size = flashSize / 1024 / 1024; // preserve the old global
-
-  Serial.println(F("=== Flash / Sketch ==="));
-  Serial.printf("Flash chip size   : %u MB\r\n", flashSize / 1024 / 1024);
-  Serial.printf("Sketch size       : %u KB\r\n", sketchSize / 1024);
-  Serial.printf("Free sketch space : %u KB\r\n", freeSketch / 1024);
-
-  /* ---------- HEAP (internal RAM) ---------- */
-  const uint32_t freeHeap = ESP.getFreeHeap(); // bytes of allocatable DRAM at this moment
-
-  Serial.println(F("\n=== RAM ==="));
-  Serial.printf("Free heap         : %u KB\r\n", freeHeap / 1024);
-
-#if CONFIG_SPIRAM_SUPPORT // True when PSRAM is compiled‑in
-  /* ---------- PSRAM (external RAM) ---------- */
-  const uint32_t psramSize = ESP.getPsramSize(); // total bytes of PSRAM
-  const uint32_t freePsram = ESP.getFreePsram(); // bytes currently free in PSRAM
-
-  Serial.printf("PSRAM size        : %u MB\r\n", psramSize / 1024 / 1024);
-  Serial.printf("Free PSRAM        : %u KB\r\n", freePsram / 1024);
-#endif
-
-  Serial.println(); // blank line for readability
+    return malloc(u32Size);
+} /* GIFAlloc() */
+// memory free callback function
+void GIFFree(void *p)
+{
+    free(p);
 }
