@@ -29,6 +29,14 @@ long output_buf_size, estimateBufferSize;
 uint8_t *mjpeg_buf;
 uint16_t *output_buf;
 
+
+// Interrupt to skip to the next mjpeg when the boot button is pressed
+volatile bool skipRequested = false; 
+void IRAM_ATTR onButtonPress()
+{
+    skipRequested = true; // flag handled in mjpeg loop
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -36,7 +44,7 @@ void setup()
     delay(2000); // For debugging, give time for the board to reconnect to com port
 
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-    
+
     // Display initialization
     if (!gfx->begin(GFX_SPEED))
     {
@@ -75,6 +83,11 @@ void setup()
     mjpeg_buf = (uint8_t *)heap_caps_malloc(estimateBufferSize, MALLOC_CAP_8BIT);
 
     loadMjpegFilesList();
+
+    // Set the boot button to skip the current mjpeg playing and go to the next
+    pinMode(BTN_A, INPUT);                        // active‑low
+    attachInterrupt(digitalPinToInterrupt(BTN_A), // fast ISR
+                    onButtonPress, FALLING);      // press == LOW
 }
 
 // Set the brightness of the display to GFX_BRIGHTNESS
@@ -139,7 +152,7 @@ void mjpegPlayFromSDCard(char *mjpegFilename)
             &mjpegFile, mjpeg_buf, jpegDrawCallback, true /* useBigEndian */,
             0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
 
-        while (mjpegFile.available() && mjpeg.readMjpegBuf())
+        while (!skipRequested && mjpegFile.available() && mjpeg.readMjpegBuf())
         {
             // Read video
             total_read_video += millis() - curr_ms;
@@ -155,6 +168,7 @@ void mjpegPlayFromSDCard(char *mjpegFilename)
         int time_used = millis() - start_ms;
         Serial.println(F("MJPEG end"));
         mjpegFile.close();
+        skipRequested = false; // ready for next video
         float fps = 1000.0 * total_frames / time_used;
         total_decode_video -= total_show_video;
         Serial.printf("Total frames: %d\n", total_frames);
