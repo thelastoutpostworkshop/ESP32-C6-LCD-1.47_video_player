@@ -29,12 +29,17 @@ long output_buf_size, estimateBufferSize;
 uint8_t *mjpeg_buf;
 uint16_t *output_buf;
 
-
 // Interrupt to skip to the next mjpeg when the boot button is pressed
-volatile bool skipRequested = false; 
+volatile bool skipRequested = false;
+volatile uint32_t lastPress = 0;
 void IRAM_ATTR onButtonPress()
 {
-    skipRequested = true; // flag handled in mjpeg loop
+    uint32_t now = millis();
+    if (now - lastPress > 300)
+    { // 300 ms debounce
+        skipRequested = true;
+        lastPress = now;
+    }
 }
 
 void setup()
