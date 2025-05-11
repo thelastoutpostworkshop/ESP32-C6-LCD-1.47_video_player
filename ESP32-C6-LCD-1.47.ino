@@ -2,11 +2,10 @@
 // Use board "ESP32C6 Dev Module" (last tested on v3.2.0)
 //
 
-// Install "GFX Library for Arduino" with the Library Manager (last tested on v1.5.9)
-
-#include "PINS_ESP32-C6-LCD-1_47.h"
-#include "MjpegClass.h"
-#include "SD.h" // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include "PINS_ESP32-C6-LCD-1_47.h" // Install "GFX Library for Arduino" with the Library Manager (last tested on v1.5.9)
+#include "MjpegClass.h"             // Included in this project
+#include "SD.h"                     // Included with the Espressif Arduino Core (last tested on v3.2.0)
+#include "Arduino.h"
 
 #define GFX_BRIGHTNESS 255
 
@@ -20,6 +19,7 @@ int mjpegCount = 0;
 static int currentMjpegIndex = 0;
 static File mjpegFile; // temp gif file holder
 
+// Global variables for mjpeg
 MjpegClass mjpeg;
 int total_frames;
 unsigned long total_read_video;
@@ -35,28 +35,33 @@ void setup()
     Serial.begin(115200);
     DEV_DEVICE_INIT();
     delay(2000); // For debugging, give time for the board to reconnect to com port
+
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-    // Init Display
+    
+    // Display initialization
     if (!gfx->begin(GFX_SPEED))
     {
-        Serial.println("gfx->begin() failed!");
+        Serial.println("Display initialization failed!");
         while (true)
         {
-            /* code */
+            /* no need to continue */
         }
     }
     gfx->setRotation(0);
     gfx->fillScreen(RGB565_BLACK);
-    ledcAttachChannel(GFX_BL, 1000, 8, 1);
-    ledcWrite(GFX_BL, GFX_BRIGHTNESS);
+    setDisplayBrigthness();
+
+    // SD card initialization
     if (!SD.begin(SD_CS, SPI, 80000000, "/sd"))
     {
         Serial.println("ERROR: File system mount failed!");
         while (true)
         {
-            /* code */
+            /* no need to continue */
         }
     }
+
+    // Buffer allocation for mjpeg playing
     output_buf_size = gfx->width() * 4 * 2;
     output_buf = (uint16_t *)heap_caps_aligned_alloc(16, output_buf_size * sizeof(uint16_t), MALLOC_CAP_DMA);
     if (!output_buf)
@@ -64,16 +69,20 @@ void setup()
         Serial.println("output_buf aligned_alloc failed!");
         while (true)
         {
-            /* code */
+            /* no need to continue */
         }
     }
-
     estimateBufferSize = gfx->width() * gfx->height() * 2 / 5;
     mjpeg_buf = (uint8_t *)heap_caps_malloc(estimateBufferSize, MALLOC_CAP_8BIT);
 
     loadMjpegFilesList();
 }
 
+void setDisplayBrigthness()
+{
+    ledcAttachChannel(GFX_BL, 1000, 8, 1);
+    ledcWrite(GFX_BL, GFX_BRIGHTNESS);
+}
 void loop()
 {
     playSelectedMjpeg(currentMjpegIndex);
