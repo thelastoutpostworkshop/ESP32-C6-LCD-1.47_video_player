@@ -1,6 +1,5 @@
 // Tutorial :
 // Use board "ESP32C6 Dev Module" (last tested on v3.2.0)
-//
 
 #include "PINS_ESP32-C6-LCD-1_47.h" // Install "GFX Library for Arduino" with the Library Manager (last tested on v1.5.9)
 #include "MjpegClass.h"             // Included in this project
@@ -78,6 +77,7 @@ void setup()
     loadMjpegFilesList();
 }
 
+// Set the brightness of the display to GFX_BRIGHTNESS
 void setDisplayBrigthness()
 {
     ledcAttachChannel(GFX_BL, 1000, 8, 1);
@@ -93,10 +93,11 @@ void loop()
     }
 }
 
-void playSelectedMjpeg(int gifIndex)
+// Play the current mjpeg
+void playSelectedMjpeg(int mjpegIndex)
 {
-    // Build the full path for the selected GIF.
-    String fullPath = String(MJPEG_FOLDER) + "/" + mjpegFileList[gifIndex];
+    // Build the full path for the selected mjpeg
+    String fullPath = String(MJPEG_FOLDER) + "/" + mjpegFileList[mjpegIndex];
     char mjpegFilename[128];
     fullPath.toCharArray(mjpegFilename, sizeof(mjpegFilename));
 
@@ -104,16 +105,16 @@ void playSelectedMjpeg(int gifIndex)
     mjpegPlayFromSDCard(mjpegFilename);
 }
 
+// Callback function to draw a JPEG
 int jpegDrawCallback(JPEGDRAW *pDraw)
 {
-    // Serial.printf("Draw pos = (%d, %d), size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-
     unsigned long s = millis();
     gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
     total_show_video += millis() - s;
     return 1;
 }
 
+// Play a mjpeg stored on the SD card
 void mjpegPlayFromSDCard(char *mjpegFilename)
 {
     File mjpegFile = SD.open(mjpegFilename, "r");
@@ -165,7 +166,7 @@ void mjpegPlayFromSDCard(char *mjpegFilename)
     }
 }
 
-// Read the gif file list in the gif folder
+// Read the mjpeg file list in the mjpeg folder
 void loadMjpegFilesList()
 {
     File mjpegDir = SD.open(MJPEG_FOLDER);
