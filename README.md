@@ -1,4 +1,4 @@
-# ESP32-C6-LCD-1.47
+# ESP32-C6-LCD-1.47 Movie Viewer
 
 ## 🎬 How to Use These FFmpeg Commands
 
