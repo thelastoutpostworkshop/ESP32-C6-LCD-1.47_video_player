@@ -1,5 +1,12 @@
 # ESP32-C6-LCD-1.47 Video Player
 
+<a href="https://www.buymeacoffee.com/thelastoutpostworkshop" target="_blank">
+<img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee">
+</a>
+
+## Youtube Tutorial
+[<img src="https://github.com/thelastoutpostworkshop/images/blob/main/videoplayer.png" width="500">](https://youtu.be/JqQEG0eipic)
+
 ## 🎬 How to Use These FFmpeg Commands
 
 Each of the following commands generates a `.mjpeg` file — a Motion JPEG video format — from an input `.mp4` or `.mov` video, optimized for use in frame-by-frame playback with an SD card reader.

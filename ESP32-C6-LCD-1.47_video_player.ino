@@ -1,4 +1,4 @@
-// Tutorial :
+// Tutorial : https://youtu.be/JqQEG0eipic
 // Use board "ESP32C6 Dev Module" (last tested on v3.2.0)
 
 #include "PINS_ESP32-C6-LCD-1_47.h" // Install "GFX Library for Arduino" with the Library Manager (last tested on v1.5.9)
