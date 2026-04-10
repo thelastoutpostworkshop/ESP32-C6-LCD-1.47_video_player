@@ -19,6 +19,16 @@ ESP32-C6-LCD-1.47 Video Player turns the ESP32-C6-LCD-1.47 board into a standalo
 - Prints runtime playback metrics over Serial (frames, FPS, read/decode/display time)
 - Includes ready-to-use FFmpeg conversion commands for `.mp4`/`.mov` sources
 
+<p align="center">
+  <a href="https://thelastoutpostworkshop.github.io/video_conversion/">
+    <img src="https://img.shields.io/badge/Open-Video%20Conversion%20Studio-FF6A00?style=for-the-badge" alt="Open Video Conversion Studio">
+  </a>
+</p>
+
+<p align="center">
+  Need to convert your videos first? Use <a href="https://thelastoutpostworkshop.github.io/video_conversion/"><strong>Video Conversion Studio</strong></a> to prepare MJPEG files for this player.
+</p>
+
 ## What You Can Customize
 - `GFX_BRIGHTNESS`: display backlight brightness
 - `MJPEG_FOLDER`: SD directory used to discover videos
